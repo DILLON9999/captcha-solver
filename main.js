@@ -8,13 +8,9 @@ const url = require('url');
 const querystring = require('querystring')
 var expressApp, bankExpressApp, bankServer, captchaServer;
 
-// Establish Global Varibales for Sitekey and Domain
-let globalSitekey;
-let globalDomain;
-
 
 // Start Captcha Bank Array
-let captchaBank = [];
+let captchaBank = []
 
 
 // Launch When Ready
@@ -40,17 +36,13 @@ async function initCaptchaWindow() {
 	captchaWindow.on('close', function(e){
 		captchaWindow = null;
 	});
-
-	captchaWindow.webContents.session.webRequest.onBeforeRequest({urls: ['https://myaccount.google.com/*']}, (details, callback) => {
-		callback({redirectURL: 'http://www.gamenerdz.com/'})
-	})
 };
 
 
 // Setup Page Intercept To Replace HTML
 function SetupIntercept() {
 	protocol.interceptBufferProtocol('http', (req, callback) => {
-		if(req.url == `http://www.${globalDomain}/`) {
+		if(req.url.includes('http://')) {
 			fs.readFile(__dirname + '/captcha.html', 'utf8', function(err, html){
 				callback({mimeType: 'text/html', data: Buffer.from(html)});
 			});
@@ -129,9 +121,11 @@ function initBankServer() {
 		initCaptchaWindow();
 	});
 
-	bankExpressApp.get('/fetch', function(req, res) {
+	bankExpressApp.get('/fetch', async function(req, res) {
+
 		return res.json(captchaBank),
 		captchaBank.splice(0,1);
+
 	});
 
 	bankServer = bankExpressApp.listen(bankExpressApp.get('port'));
@@ -154,13 +148,8 @@ function initNeededCaptchaServer() {
 
 	captchaExpressApp.get('/CaptchaNeeded', async function(req, res) {
 
-
 		let parsedUrl = await url.parse(req.url)
 		let parsedQs = await querystring.parse(parsedUrl.query)
-
-		await console.log(parsedQs)
-
-		globalDomain = parsedQs.domain
 
 		await captchaWindow.loadURL(`http://www.${parsedQs.domain}/`)
 
