@@ -4,19 +4,26 @@ const fs = require('fs');
 const moment = require('moment');
 const express = require('express')
 const bodyParser = require('body-parser')
+const url = require('url');
+const querystring = require('querystring')
+var expressApp, bankExpressApp, bankServer, captchaServer;
 
-var expressApp, bankExpressApp, bankServer;
+// Establish Global Varibales for Sitekey and Domain
+let globalSitekey;
+let globalDomain;
 
-var captchaBank = [];
 
-function sleep(ms) {
-	return new Promise(resolve => setTimeout(resolve, ms));
-}
+// Start Captcha Bank Array
+let captchaBank = [];
 
+
+// Launch When Ready
 app.on('ready', () => {
 	initCaptchaWindow();
 })
 
+
+// Open Captcha Window
 async function initCaptchaWindow() {
 	captchaWindow = new BrowserWindow({
 		width: 480,
@@ -28,22 +35,22 @@ async function initCaptchaWindow() {
 
 	SetupIntercept();
 
-	captchaWindow.loadURL('https://accounts.google.com');
-	
-	await sleep(1000)
+	await captchaWindow.loadFile('loader.html');
 	
 	captchaWindow.on('close', function(e){
 		captchaWindow = null;
 	});
 
 	captchaWindow.webContents.session.webRequest.onBeforeRequest({urls: ['https://myaccount.google.com/*']}, (details, callback) => {
-		callback({redirectURL: 'http://supremenewyork.com/'})
+		callback({redirectURL: 'http://www.gamenerdz.com/'})
 	})
 };
 
+
+// Setup Page Intercept To Replace HTML
 function SetupIntercept() {
 	protocol.interceptBufferProtocol('http', (req, callback) => {
-		if(req.url == 'http://supremenewyork.com/') {
+		if(req.url == `http://www.${globalDomain}/`) {
 			fs.readFile(__dirname + '/captcha.html', 'utf8', function(err, html){
 				callback({mimeType: 'text/html', data: Buffer.from(html)});
 			});
@@ -77,20 +84,24 @@ function SetupIntercept() {
 	})
 };
 
-electron.ipcMain.on('openCapWindow', function(event, args) {
-    initCaptchaWindow();
-});
 
-electron.ipcMain.on('sendCaptcha', function(event, token) {
+// Catch Captcha Request
+electron.ipcMain.on('sendCaptcha', async function(event, token) {
 
-	captchaBank.push({
+	await console.log(token)
+
+	await captchaWindow.loadFile('loader.html');
+
+	await captchaBank.push({
 	  token: token,	
 	  timestamp: moment(),
-	  host: 'http://supremenewyork.com/',
-	  sitekey: '6LeWwRkUAAAAAOBsau7KpuC9AV-6J8mhw4AjC3Xz'
+	  host: 'http://www.gamenerdz.com/',
+	  sitekey: '6LccmasUAAAAAIRhScC9asOrH_rQblw06weNOzDI'
 	})
 });
 
+
+// Delete Old Captchas From The Bank
 setInterval(function(){
 	for (var i = 0; i < captchaBank.length; i++) {
 
@@ -102,6 +113,8 @@ setInterval(function(){
 	}
 }, 1000);
 
+
+// Start Locally Hosted Captcha Bank
 function initBankServer() {
 	bankExpressApp = express()
 
@@ -123,8 +136,49 @@ function initBankServer() {
 
 	bankServer = bankExpressApp.listen(bankExpressApp.get('port'));
 
-	}
-  
+}
+
 initBankServer();
 
 
+// Handle Task Captcha Requests
+function initNeededCaptchaServer() {
+	captchaExpressApp = express()
+
+	let port = '8081';
+
+	console.log('Captcha server listening on port: ' + port);
+	captchaExpressApp.set('port', port);
+	captchaExpressApp.use(bodyParser.json());
+	captchaExpressApp.use(bodyParser.urlencoded({ extended: true }));
+
+	captchaExpressApp.get('/CaptchaNeeded', async function(req, res) {
+
+
+		let parsedUrl = await url.parse(req.url)
+		let parsedQs = await querystring.parse(parsedUrl.query)
+
+		await console.log(parsedQs)
+
+		globalDomain = parsedQs.domain
+
+		await captchaWindow.loadURL(`http://www.${parsedQs.domain}/`)
+
+		await sleep(500)
+
+		await captchaWindow.webContents.send('sitekey', parsedQs.sitekey)
+
+		return res.send('Sent')
+
+	});
+
+	captchaServer = captchaExpressApp.listen(captchaExpressApp.get('port'))
+}
+
+initNeededCaptchaServer()
+
+
+// Delay Function
+function sleep(ms) {
+	return new Promise(resolve => setTimeout(resolve, ms));
+}

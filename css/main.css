@@ -1,0 +1,41 @@
+* {
+  overflow-x: hidden;
+  overflow-y: hidden;
+  padding: 0px !important;
+  margin: 0px !important;
+}
+.v1_2 {
+  width: 480px;
+  height: 680px;
+  background: rgba(0,0,0,0.6700000166893005);
+  opacity: 1;
+  position: relative;
+  top: 0px;
+  left: 0px;
+  overflow: hidden;
+}
+.v1_4 {
+  width: 243px;
+  color: rgba(255,255,255,1);
+  position: absolute;
+  top: 340px;
+  left: 119px;
+  font-family: Roboto;
+  font-weight: Regular;
+  font-size: 48px;
+  opacity: 1;
+  text-align: center;
+}
+.v1_5 {
+  width: 395px;
+  height: 395px;
+  background: url("../images/v1_5.png");
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  opacity: 1;
+  position: absolute;
+  top: 55px;
+  left: 43px;
+  overflow: hidden;
+}
