@@ -8,41 +8,9 @@ const url = require('url');
 const querystring = require('querystring')
 const axios = require('axios')
 
-class Queue {
-	constructor() {
-		this.top = 0;
-		this.bottom = 0;
-		this.storage = {}; // Holds Sitekeys/Domains Needed
-	}
+let solverBusy = 'false';
 
-	enqueue(val) {
-		this.storage[this.top] = val;
-		this.top++; 
-	}
-
-	dequeue() {
-		if(!this.isEmpty()) {
-			let removedElement = this.storage[this.bottom];
-			delete this.storage[this.bottom]
-			this.bottom++;
-			return removedElement;
-		}
-	}
-
-	peek() {
-		return this.storage[this.bottom]
-	}
-
-	size() {
-		return this.top - this.bottom
-	}
-
-	isEmpty() {
-		return this.size() === 0;
-	}
-}
-
-let captchaQueue = new Queue
+let captchaBank = []
 
 var expressApp, bankExpressApp, bankServer, captchaServer;
 
@@ -117,8 +85,6 @@ function SetupIntercept() {
 // Catch Captcha Request
 electron.ipcMain.on('sendCaptcha', async function(event, token, identifier) {
 
-	// await console.log(token)
-
 	await captchaWindow.loadFile('loader.html');
 
 	const captchaConfig = {
@@ -133,7 +99,54 @@ electron.ipcMain.on('sendCaptcha', async function(event, token, identifier) {
     })
     .catch(function (error) {
         console.log(error);
-    });
+	});
+	
+	if (captchaBank.length > 0) {
+
+		await fs.writeFile('captcha.html', `
+		<html>
+		<head>
+			<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+			<title>Captcha Harvester</title>
+			<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+		</head>
+		<body style="background-color: #303030;">
+
+			<form action="/submit" method="POST">
+				<div class="g-recaptcha" id="captchaFrame" data-sitekey="${captchaBank[0].sitekey}" data-callback="sub" style="position: absolute;top: 50%;left: 50%;transform: translate(-50%, -50%);"></div>
+			</form>
+
+			<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+			<script>
+
+				const remote = require('electron').remote
+				const app = remote.app
+				const ipcRenderer = require('electron').ipcRenderer
+
+				function sub() {
+					ipcRenderer.send('sendCaptcha', grecaptcha.getResponse(), '${captchaBank[0].identifier}');
+					grecaptcha.reset();
+				}
+
+			</script>
+		</body>
+		</html>`, function (err) {
+			if (err) throw err;
+			console.log('HTML Saved')
+		})
+
+		await sleep(100)
+
+		await captchaWindow.loadURL(`http://www.${captchaBank[0].domain}/`)
+
+		await captchaBank.splice(0, 1)
+
+	} else {
+
+		solverBusy = await 'false'
+
+	}
 
 });
 
@@ -150,59 +163,69 @@ function initNeededCaptchaServer() {
 	captchaExpressApp.use(bodyParser.urlencoded({ extended: true }));
 
 	captchaExpressApp.get('/CaptchaNeeded', async function(req, res) {
-
-		console.log('sent')
-
+		
 		let parsedUrl = await url.parse(req.url)
 		let parsedQs = await querystring.parse(parsedUrl.query)
 
-		let queueOrder = await {
-			sitekey: parsedQs.sitekey,
-			domain: parsedQs.domain
+		if (solverBusy === 'false') {
+
+			solverBusy = await 'true'
+
+			await fs.writeFile('captcha.html', `
+			<html>
+			<head>
+				<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+				<title>Captcha Harvester</title>
+				<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+			</head>
+			<body style="background-color: #303030;">
+	
+				<form action="/submit" method="POST">
+					<div class="g-recaptcha" id="captchaFrame" data-sitekey="${parsedQs.sitekey}" data-callback="sub" style="position: absolute;top: 50%;left: 50%;transform: translate(-50%, -50%);"></div>
+				</form>
+	
+				<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	
+				<script>
+	
+					const remote = require('electron').remote
+					const app = remote.app
+					const ipcRenderer = require('electron').ipcRenderer
+	
+					function sub() {
+						ipcRenderer.send('sendCaptcha', grecaptcha.getResponse(), '${parsedQs.identifier}');
+						grecaptcha.reset();
+					}
+	
+				</script>
+			</body>
+			</html>`, function (err) {
+				if (err) throw err;
+				console.log('HTML Saved')
+			})
+	
+			await sleep(100)
+	
+			await captchaWindow.loadURL(`http://www.${parsedQs.domain}/`)
+	
+			await sleep(500)
+	
+			return res.send('Sent')
+
+		} else {
+
+			await captchaBank.push({
+				sitekey: parsedQs.sitekey,	
+				domain: parsedQs.domain,
+				identifier: parsedQs.identifier
+			})
+
+			await console.log('Added To Queue')
+
+			return res.send('Added To Queue')
+
 		}
 
-		await captchaQueue.enqueue(queueOrder)
-
-		await fs.writeFile('captcha.html', `
-		<html>
-		<head>
-			<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-			<title>Captcha Harvester</title>
-			<script src="https://www.google.com/recaptcha/api.js" async defer></script>
-		</head>
-		<body style="background-color: #303030;">
-
-			<form action="/submit" method="POST">
-				<div class="g-recaptcha" id="captchaFrame" data-sitekey="${parsedQs.sitekey}" data-callback="sub" style="position: absolute;top: 50%;left: 50%;transform: translate(-50%, -50%);"></div>
-			</form>
-
-			<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-
-			<script>
-
-				const remote = require('electron').remote
-				const app = remote.app
-				const ipcRenderer = require('electron').ipcRenderer
-
-				function sub() {
-					ipcRenderer.send('sendCaptcha', grecaptcha.getResponse(), '${parsedQs.identifier}');
-					grecaptcha.reset();
-				}
-
-			</script>
-		</body>
-		</html>`, function (err) {
-			if (err) throw err;
-			console.log('HTML Saved')
-		})
-
-		await sleep(100)
-
-		await captchaWindow.loadURL(`http://www.${parsedQs.domain}/`)
-
-		await sleep(500)
-
-		return res.send('Sent')
 
 	});
 
