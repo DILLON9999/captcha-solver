@@ -46,10 +46,6 @@ let captchaQueue = new Queue
 
 var expressApp, bankExpressApp, bankServer, captchaServer;
 
-// Start Captcha Bank Array
-let captchaBank = []
-
-
 // Launch When Ready
 app.on('ready', () => {
 	initCaptchaWindow();
@@ -140,48 +136,6 @@ electron.ipcMain.on('sendCaptcha', async function(event, token, identifier) {
     });
 
 });
-
-
-// Delete Old Captchas From The Bank
-setInterval(function(){
-	for (var i = 0; i < captchaBank.length; i++) {
-
-  	if (moment().diff(moment(captchaBank[i].timestamp), 'seconds') > 110) {
-		console.log('Removing Expired Captcha Token')
-		captchaBank.splice(0,1)
-		
-	  }
-	}
-}, 1000);
-
-
-// Start Locally Hosted Captcha Bank
-function initBankServer() {
-	bankExpressApp = express()
-
-	let port = '8080';
-
-	console.log('Bank server listening on port: ' + port);
-	bankExpressApp.set('port', port);
-	bankExpressApp.use(bodyParser.json());
-	bankExpressApp.use(bodyParser.urlencoded({ extended: true }));
-
-	bankExpressApp.get('/trigger', function(req, res) {
-		initCaptchaWindow();
-	});
-
-	bankExpressApp.get('/fetch', async function(req, res) {
-
-		return res.json(captchaBank),
-		captchaBank.splice(0,1);
-
-	});
-
-	bankServer = bankExpressApp.listen(bankExpressApp.get('port'));
-
-}
-
-initBankServer();
 
 
 // Handle Task Captcha Requests
