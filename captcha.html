@@ -8,7 +8,7 @@
 		<body style="background-color: #303030;">
 
 			<form action="/submit" method="POST">
-				<div class="g-recaptcha" id="captchaFrame" data-sitekey="" data-callback="sub" style="position: absolute;top: 50%;left: 50%;transform: translate(-50%, -50%);"></div>
+				<div class="g-recaptcha" id="captchaFrame" data-sitekey="6LccmasUAAAAAIRhScC9asOrH_rQblw06weNOzDI" data-callback="sub" style="position: absolute;top: 50%;left: 50%;transform: translate(-50%, -50%);"></div>
 			</form>
 
 			<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
@@ -20,7 +20,7 @@
 				const ipcRenderer = require('electron').ipcRenderer
 
 				function sub() {
-					ipcRenderer.send('sendCaptcha', grecaptcha.getResponse());
+					ipcRenderer.send('sendCaptcha', grecaptcha.getResponse(), 'test123');
 					grecaptcha.reset();
 				}
 

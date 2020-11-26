@@ -6,8 +6,45 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const url = require('url');
 const querystring = require('querystring')
-var expressApp, bankExpressApp, bankServer, captchaServer;
+const axios = require('axios')
 
+class Queue {
+	constructor() {
+		this.top = 0;
+		this.bottom = 0;
+		this.storage = {}; // Holds Sitekeys/Domains Needed
+	}
+
+	enqueue(val) {
+		this.storage[this.top] = val;
+		this.top++; 
+	}
+
+	dequeue() {
+		if(!this.isEmpty()) {
+			let removedElement = this.storage[this.bottom];
+			delete this.storage[this.bottom]
+			this.bottom++;
+			return removedElement;
+		}
+	}
+
+	peek() {
+		return this.storage[this.bottom]
+	}
+
+	size() {
+		return this.top - this.bottom
+	}
+
+	isEmpty() {
+		return this.size() === 0;
+	}
+}
+
+let captchaQueue = new Queue
+
+var expressApp, bankExpressApp, bankServer, captchaServer;
 
 // Start Captcha Bank Array
 let captchaBank = []
@@ -31,11 +68,11 @@ async function initCaptchaWindow() {
 
 	SetupIntercept();
 
-	// await captchaWindow.loadFile('loader.html');
+	await captchaWindow.loadFile('loader.html');
 
-	await captchaWindow.loadURL('https://accounts.google.com', {
-		userAgent: 'Chrome'
-	})
+	// await captchaWindow.loadURL('https://accounts.google.com', {
+	// 	userAgent: 'Chrome'
+	// })
 	
 	captchaWindow.on('close', function(e){
 		captchaWindow = null;
@@ -82,18 +119,26 @@ function SetupIntercept() {
 
 
 // Catch Captcha Request
-electron.ipcMain.on('sendCaptcha', async function(event, token) {
+electron.ipcMain.on('sendCaptcha', async function(event, token, identifier) {
 
-	await console.log(token)
+	// await console.log(token)
 
 	await captchaWindow.loadFile('loader.html');
 
-	await captchaBank.push({
-	  token: token,	
-	  timestamp: moment(),
-	  host: 'http://www.gamenerdz.com/',
-	  sitekey: '6LccmasUAAAAAIRhScC9asOrH_rQblw06weNOzDI'
-	})
+	const captchaConfig = {
+        method: 'get',
+        url: `http://127.0.0.1:2121/${identifier}?captcha=${token}`,
+        headers: { }
+	};
+	
+	await axios(captchaConfig)
+	.then(async function (response) {
+		console.log(token)
+    })
+    .catch(function (error) {
+        console.log(error);
+    });
+
 });
 
 
@@ -152,8 +197,17 @@ function initNeededCaptchaServer() {
 
 	captchaExpressApp.get('/CaptchaNeeded', async function(req, res) {
 
+		console.log('sent')
+
 		let parsedUrl = await url.parse(req.url)
 		let parsedQs = await querystring.parse(parsedUrl.query)
+
+		let queueOrder = await {
+			sitekey: parsedQs.sitekey,
+			domain: parsedQs.domain
+		}
+
+		await captchaQueue.enqueue(queueOrder)
 
 		await fs.writeFile('captcha.html', `
 		<html>
@@ -177,7 +231,7 @@ function initNeededCaptchaServer() {
 				const ipcRenderer = require('electron').ipcRenderer
 
 				function sub() {
-					ipcRenderer.send('sendCaptcha', grecaptcha.getResponse());
+					ipcRenderer.send('sendCaptcha', grecaptcha.getResponse(), '${parsedQs.identifier}');
 					grecaptcha.reset();
 				}
 
