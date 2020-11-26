@@ -31,7 +31,11 @@ async function initCaptchaWindow() {
 
 	SetupIntercept();
 
-	await captchaWindow.loadFile('loader.html');
+	// await captchaWindow.loadFile('loader.html');
+
+	await captchaWindow.loadURL('https://accounts.google.com', {
+		userAgent: 'Chrome'
+	})
 	
 	captchaWindow.on('close', function(e){
 		captchaWindow = null;
@@ -151,11 +155,44 @@ function initNeededCaptchaServer() {
 		let parsedUrl = await url.parse(req.url)
 		let parsedQs = await querystring.parse(parsedUrl.query)
 
+		await fs.writeFile('captcha.html', `
+		<html>
+		<head>
+			<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+			<title>Captcha Harvester</title>
+			<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+		</head>
+		<body style="background-color: #303030;">
+
+			<form action="/submit" method="POST">
+				<div class="g-recaptcha" id="captchaFrame" data-sitekey="${parsedQs.sitekey}" data-callback="sub" style="position: absolute;top: 50%;left: 50%;transform: translate(-50%, -50%);"></div>
+			</form>
+
+			<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+			<script>
+
+				const remote = require('electron').remote
+				const app = remote.app
+				const ipcRenderer = require('electron').ipcRenderer
+
+				function sub() {
+					ipcRenderer.send('sendCaptcha', grecaptcha.getResponse());
+					grecaptcha.reset();
+				}
+
+			</script>
+		</body>
+		</html>`, function (err) {
+			if (err) throw err;
+			console.log('HTML Saved')
+		})
+
+		await sleep(100)
+
 		await captchaWindow.loadURL(`http://www.${parsedQs.domain}/`)
 
 		await sleep(500)
-
-		await captchaWindow.webContents.send('sitekey', parsedQs.sitekey)
 
 		return res.send('Sent')
 
