@@ -1,5 +1,5 @@
 const electron = require('electron')
-const { app, BrowserWindow, protocol, net } = electron;
+const { app, BrowserWindow, protocol, net, ipcMain } = electron;
 const fs = require('fs');
 const moment = require('moment');
 const express = require('express')
@@ -14,8 +14,10 @@ let captchaBank = []
 
 var expressApp, bankExpressApp, bankServer, captchaServer;
 
+
 // Launch When Ready
 app.on('ready', () => {
+	app.userAgentFallback = app.userAgentFallback.replace('Electron/' + process.versions.electron, '');
 	initCaptchaWindow();
 })
 
@@ -26,17 +28,19 @@ async function initCaptchaWindow() {
 		width: 480,
 		height: 680,
 			webPreferences: {
-				allowRunningInsecureContent: true
+				allowRunningInsecureContent: true,
+				nativeWindowOpen: true,
+				nodeIntegration: true
 			}
 	})
 
 	SetupIntercept();
 
-	await captchaWindow.loadFile('loader.html');
+	// await captchaWindow.loadFile('loader.html');
 
-	// await captchaWindow.loadURL('https://accounts.google.com', {
-	// 	userAgent: 'Chrome'
-	// })
+	await captchaWindow.loadURL('https://accounts.google.com', {
+		userAgent: 'Chrome'
+	})
 	
 	captchaWindow.on('close', function(e){
 		captchaWindow = null;
@@ -85,6 +89,8 @@ function SetupIntercept() {
 // Catch Captcha Request
 electron.ipcMain.on('sendCaptcha', async function(event, token, identifier) {
 
+	await console.log('Solved')
+
 	await captchaWindow.loadFile('loader.html');
 
 	const captchaConfig = {
@@ -122,7 +128,7 @@ electron.ipcMain.on('sendCaptcha', async function(event, token, identifier) {
 
 				const remote = require('electron').remote
 				const app = remote.app
-				const ipcRenderer = require('electron').ipcRenderer
+				const { ipcRenderer } = require('electron')
 
 				function sub() {
 					ipcRenderer.send('sendCaptcha', grecaptcha.getResponse(), '${captchaBank[0].identifier}');
@@ -138,7 +144,9 @@ electron.ipcMain.on('sendCaptcha', async function(event, token, identifier) {
 
 		await sleep(100)
 
-		await captchaWindow.loadURL(`http://www.${captchaBank[0].domain}/`)
+		await captchaWindow.loadURL(`http://www.${captchaBank[0].domain}/`, {
+			userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.198 Safari/537.36'
+		})
 
 		await captchaBank.splice(0, 1)
 
@@ -190,7 +198,7 @@ function initNeededCaptchaServer() {
 	
 					const remote = require('electron').remote
 					const app = remote.app
-					const ipcRenderer = require('electron').ipcRenderer
+					const { ipcRenderer } = require('electron')
 	
 					function sub() {
 						ipcRenderer.send('sendCaptcha', grecaptcha.getResponse(), '${parsedQs.identifier}');
@@ -206,7 +214,9 @@ function initNeededCaptchaServer() {
 	
 			await sleep(100)
 	
-			await captchaWindow.loadURL(`http://www.${parsedQs.domain}/`)
+			await captchaWindow.loadURL(`http://www.${parsedQs.domain}/`, {
+				userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.198 Safari/537.36'
+			})
 	
 			await sleep(500)
 	

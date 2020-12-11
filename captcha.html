@@ -17,10 +17,10 @@
 	
 					const remote = require('electron').remote
 					const app = remote.app
-					const ipcRenderer = require('electron').ipcRenderer
+					const { ipcRenderer } = require('electron')
 	
 					function sub() {
-						ipcRenderer.send('sendCaptcha', grecaptcha.getResponse(), '1111132323');
+						ipcRenderer.send('sendCaptcha', grecaptcha.getResponse(), 'test123');
 						grecaptcha.reset();
 					}
 	
